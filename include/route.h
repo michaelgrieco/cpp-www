@@ -56,7 +56,7 @@ typedef struct route_variable_t {
         }
     }
 
-    //route_variable_t(route_variable_type_t type) : type(type), value() {}
+    route_variable_t(route_variable_type_t type) : type(type), value() {}
 
     route_variable_t(int i) : type(INT), value() { value.i = i; }
     route_variable_t(float f) : type(FLOAT), value() { value.f = f; }
@@ -106,8 +106,8 @@ typedef struct route_node_t {
     bool is_static;
     route_variable_t variable;
     std::string name;
-    std::vector<struct route_node_t*> *children;
-    callbacks_t *callbacks;
+    std::vector<struct route_node_t*> children;
+    callbacks_t callbacks;
 } route_node_t;
 
 // Parse a variable

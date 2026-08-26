@@ -22,12 +22,9 @@ void parse_query_args(char *buf, int i, int path_size, variables_t &vars) {
     int token_start_i = i;
     std::cout << "parse_query_args " << i << " " << path_size << std::endl;
     for (; i <= path_size; ++i) {
-        std::cout << "  character " << i << " is " << (int)buf[i] << std::endl;
         bool is_name = buf[i] == '=';
         if (is_name || buf[i] == '&' || buf[i] == '\0') {
-            //int token_length = i - token_start_i;
             buf[i] = '\0';
-            //std::cout << "New query token from " << token_start_i << " to " << i << ": " << std::string(buf + token_start_i) << std::endl;
 
             if (is_name) {
                 // token is a key, store for later
@@ -35,7 +32,6 @@ void parse_query_args(char *buf, int i, int path_size, variables_t &vars) {
             }
             else {
                 route_variable_t var = parse_var(std::string(buf + token_start_i));
-                //std::cout << "Setting vars (" << (int)vars.size() << ") " << var_name << ": " << var.to_string() << std::endl;
                 vars[var_name] = var;
                 var_name = "";
             }
@@ -44,7 +40,6 @@ void parse_query_args(char *buf, int i, int path_size, variables_t &vars) {
             token_start_i = i + 1;
         }
     }
-    std::cout << "Returning from parse_query_args" << std::endl;
 }
 
 void parse_query_args(std::string buf, variables_t &vars) {
@@ -57,10 +52,8 @@ void parse_query_args(std::string buf, variables_t &vars) {
     for (int i = 0; i <= buf_size; ++i) {
         bool is_name = buf[i] == '=';
         if (is_name || buf[i] == '&' || buf[i] == '\0') {
-            std::cout << "Token terminates at " << i << std::endl;
             int token_length = i - token_start_i;
             buf[i] = '\0';
-            //std::cout << "New query token from " << token_start_i << " to " << i << ": " << std::string(buf + token_start_i) << std::endl;
 
             if (is_name) {
                 // token is a key, store for later
@@ -68,7 +61,6 @@ void parse_query_args(std::string buf, variables_t &vars) {
             }
             else {
                 route_variable_t var = parse_var(buf.substr(token_start_i, token_length));
-                //std::cout << "Setting vars (" << (int)vars.size() << ") " << var_name << ": " << var.to_string() << std::endl;
                 vars[var_name] = var;
                 var_name = "";
             }
@@ -84,13 +76,17 @@ void parse_query_args(std::string buf, variables_t &vars) {
 // ---------------------------------------------------------------------------
 std::string http_response(http_status_t status, const std::string& status_text,
                                  const std::string& content_type,
-                                 const std::string& body) {
+                                 const std::string& body,
+                                 std::vector<std::string> headers) {
     std::ostringstream r;
     r << "HTTP/1.1 " << status << " " << status_text << "\r\n"
       << "Content-Type: " << content_type << "\r\n"
       << "Content-Length: " << body.size() << "\r\n"
-      << "Connection: close\r\n"
-      << "\r\n"
+      << "Connection: close\r\n";
+    for (std::string header : headers) {
+        r << header << "\r\n";
+    }
+    r  << "\r\n"
       << body;
     return r.str();
 }
@@ -102,6 +98,7 @@ void send_response(SSL* ssl, std::string response) {
 void send_http_response(SSL* ssl, http_status_t status,
                                const std::string& status_text,
                                const std::string& content_type,
-                               const std::string& body) {
-    send_response(ssl, http_response(status, status_text, content_type, body));
+                               const std::string& body,
+                               std::vector<std::string> headers) {
+    send_response(ssl, http_response(status, status_text, content_type, body, headers));
 }

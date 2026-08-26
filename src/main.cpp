@@ -55,7 +55,7 @@ void index(SSL *ssl, variables_t vars, std::string body) {
     }
 
     std::string file_body = read_file(INDEX_FILE);
-    std::string response = http_response(HTTP_OKAY, "OK", "text/html", file_body);
+    std::string response = http_response(HTTP_OKAY, "OK", "text/html", file_body, {});
     send_response(ssl, response);
 }
 
@@ -64,7 +64,7 @@ void get_form(SSL *ssl, variables_t vars, std::string body) {
     (void)body;
     std::cout << "Get form callback" << std::endl;
     std::string file_body = read_file("www/form.html");
-    std::string response = http_response(HTTP_OKAY, "OK", "text/html", file_body);
+    std::string response = http_response(HTTP_OKAY, "OK", "text/html", file_body, {});
     send_response(ssl, response);
 }
 
@@ -86,7 +86,7 @@ void post_form(SSL *ssl, variables_t vars, std::string body) {
     }
 
     //std::string file_body = read_file(INDEX_FILE);
-    std::string response = http_response(HTTP_MOVED_PERMANENTLY, "Moved Permanently", "text", "Location: /form/submitted");
+    std::string response = http_response(HTTP_MOVED_PERMANENTLY, "Moved Permanently", "text", "", {"Location: /form/submitted"});
     send_response(ssl, response);
 }
 
@@ -95,14 +95,12 @@ void get_form_completion(SSL *ssl, variables_t vars, std::string body) {
     (void)body;
     std::cout << "Form completion callback" << std::endl;
     std::string file_body = read_file("www/form_completion.html");
-    std::string response = http_response(HTTP_OKAY, "OK", "text/html", file_body);
+    std::string response = http_response(HTTP_OKAY, "OK", "text/html", file_body, {});
     send_response(ssl, response);
 }
 
 route_node_t *root_ptr;
 std::vector<route_node_t*> route_nodes;
-std::vector<std::vector<route_node_t*>*> children_list;
-std::vector<callbacks_t*> callbacks_list;
 
 static int      g_listen_fd = -1;
 static SSL_CTX* g_ctx       = nullptr;
@@ -110,8 +108,6 @@ static SSL_CTX* g_ctx       = nullptr;
 static void shutdown_handler(int /*sig*/) {
     std::cout << "Shutdown handler" << std::endl;
     for (auto ptr : route_nodes) delete ptr;
-    for (auto ptr : children_list) delete ptr;
-    for (auto ptr : callbacks_list) delete ptr;
     if (g_listen_fd >= 0) close(g_listen_fd);
     if (g_ctx) SSL_CTX_free(g_ctx);
     std::exit(0);
@@ -121,24 +117,22 @@ static inline route_node_t *create_route_node(route_node_t *parent, std::string 
     int idx = (int)route_nodes.size();
 
     // create node structure
-    std::vector<route_node_t*> *children = new std::vector<route_node_t*>(0);
-    children_list.push_back(children);
-    callbacks_t *callbacks = new callbacks_t();
-    callbacks_list.push_back(callbacks);
     route_node_t *node = new route_node_t{
         .is_static = is_static,
         .variable = route_variable_t(var_type),
         .name = name,
-        .children = children,
-        .callbacks = callbacks
+        .children = {},
+        .callbacks = callbacks_t()
     };
+    std::cout << "Route name " << name << " has address " << (uint64_t)node << std::endl;
+    node->children.reserve(64);
     route_nodes.push_back(node);
-    std::cout << "Node's children is " << (uint64_t)node->children << " with " << (node->children ? (int)node->children->size() : 0) << std::endl;
+    std::cout << "  Node's number of children is " << (int)node->children.size() << std::endl;
 
     // add node to parent
     if (parent) {
-        std::cout << "Parent's children is " << (uint64_t)parent->children << " with " << (parent->children ? (int)parent->children->size() : 0) << std::endl;
-        parent->children->push_back(node);
+        std::cout << "  Parent's number of children is " << (int)parent->children.size() << std::endl;
+        parent->children.push_back(node);
     }
 
     return node;
@@ -157,32 +151,32 @@ static inline void construct_route_tree() {
     // Top-level node
     route_node_t *root_url = create_static_route_node(nullptr, "index");
     root_ptr = root_url;
-    root_url->callbacks->insert({HTTP_GET, index});
+    root_url->callbacks.insert({HTTP_GET, index});
 
     // Example ID endpoint
     route_node_t *id_url = create_variable_route_node(root_url, "id", INT);
-    root_url->callbacks->insert({HTTP_GET, index});
+    root_url->callbacks.insert({HTTP_GET, index});
 
     // Form base route
     route_node_t *form_url = create_static_route_node(root_url, "form");
-    form_url->callbacks->insert({HTTP_GET, index});
+    form_url->callbacks.insert({HTTP_GET, index});
 
     // Form completion route
     route_node_t *form_completion_url = create_static_route_node(form_url, "submitted");
     //form_url->callbacks[HTTP_GET] = get_form_completion;
-    form_url->callbacks->insert({HTTP_GET, get_form_completion});
+    form_completion_url->callbacks.insert({HTTP_GET, get_form_completion});
 
     // Form route
     route_node_t *form_id_url = create_variable_route_node(form_url, "id", STRING);
-    form_id_url->callbacks->insert({HTTP_GET, get_form});
-    form_id_url->callbacks->insert({HTTP_POST, post_form});
+    form_id_url->callbacks.insert({HTTP_GET, get_form});
+    form_id_url->callbacks.insert({HTTP_POST, post_form});
 }
 
 // ---------------------------------------------------------------------------
 // Handle one TLS connection: read the request line, route, respond.
 // ---------------------------------------------------------------------------
 void handle_client(SSL* ssl) {
-    std::cout << "Handle_client callbacks for GET: " << root_ptr->callbacks->count(HTTP_GET) << " " << (uint64_t)root_ptr << std::endl;
+    std::cout << "Handle_client callbacks for GET: " << root_ptr->callbacks.count(HTTP_GET) << " " << (uint64_t)root_ptr << std::endl;
     // Read until we have at least the request line.
     std::string buf;
     buf.reserve(2048);
@@ -242,11 +236,10 @@ void handle_client(SSL* ssl) {
     int token_start_i = 1;
     int token_length;
     variables_t vars;
-    for (; i < path_size; ++i) {
-        std::cout << "Char " << i << " is " << tmp[i] << std::endl;
+    for (; i <= path_size; ++i) {
         // test for end of a complete token
         bool is_query_start = tmp[i] == '?';
-        if (is_query_start || tmp[i] == '/') {
+        if (is_query_start || tmp[i] == '/' || tmp[i] == '\0') {
             if (i == token_start_i) {
                 break;
             }
@@ -260,21 +253,23 @@ void handle_client(SSL* ssl) {
             std::string token = std::string(tmp + token_start_i);
             route_variable_t var = parse_var(token);
             std::cout << "Token " << token << " has possible type " << var.type << std::endl;
-            for (auto iter = dst->children->begin(); iter != dst->children->end(); ++iter) {
-                route_node_t *node = *iter;
-                std::cout << "Branch " << node->name << " has type " << node->variable.type << std::endl;
+            //for (auto iter = dst->children->begin(); iter != dst->children->end(); ++iter) {
+            for (auto node : dst->children) {
+                //route_node_t *node = *iter;
+                std::cout << "  Branch " << node->name << " has type " << node->variable.type << std::endl;
                 // compare strings
                 if (node->is_static &&
                     token_length == (int)node->name.size() &&
                     token == node->name
                 ) {
+                    std::cout << "    Found static node with name " << node->name << std::endl;
                     dst = node;
                     break;
                 }
 
                 // check type equivalence for route variable
                 else if (node->variable.type == var.type) {
-                    //std::cout << "Setting vars (" << (int)vars.size() << ") " << node->name << ": " << var.to_string() << std::endl;
+                    std::cout << "    Setting vars (" << (int)vars.size() << ") " << node->name << ": " << var.to_string() << std::endl;
                     vars[node->name] = var;
                     dst = node;
                     break;
@@ -292,22 +287,20 @@ void handle_client(SSL* ssl) {
         }
     }
 
+    // get query string
     parse_query_args(tmp, i, path_size, vars);
-    std::cout << "Returned from parse_query_args" << std::endl;
 
     // callback
-    std::cout << "In dst, have " << (int)dst->callbacks->size() << " endpoints" << std::endl;
+    std::cout << "In dst, have " << (int)dst->callbacks.size() << " endpoints" << std::endl;
     std::cout << "For method " << method << std::endl;
-    std::cout << "  have " << dst->callbacks->count(method) << " endpoints and " << dst->callbacks->count(HTTP_GET) << " GET endpoints" << std::endl;
-    std::cout << "  have " << root_ptr->callbacks->count(method) << " endpoints and " << root_ptr->callbacks->count(HTTP_GET) << " GET endpoints" << std::endl;
     std::cout << "  dst is " << (uint64_t)dst << std::endl;
-    if (dst && dst->callbacks->count(method)) {
+    if (dst && dst->callbacks.count(method)) {
         
         std::cout << "  at endpoint " << dst->name << "," << std::endl;
-        dst->callbacks->operator[](method)(ssl, vars, body);
+        dst->callbacks.operator[](method)(ssl, vars, body);
     }
     else {
-        send_http_response(ssl, HTTP_NOT_FOUND, "Not Found", "text/plain", "404 Not Found");
+        send_http_response(ssl, HTTP_NOT_FOUND, "Not Found", "text/plain", "404 Not Found", {});
     }
 }
 
@@ -327,8 +320,6 @@ int main(int argc, char* argv[]) {
 
     // reserve memory
     route_nodes.reserve(64);
-    children_list.reserve(64);
-    callbacks_list.reserve(64);
 
     // register URLs
     construct_route_tree();

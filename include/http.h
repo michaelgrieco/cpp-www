@@ -38,13 +38,15 @@ void parse_query_args(std::string buf, variables_t &vars);
 
 std::string http_response(http_status_t status, const std::string& status_text,
                                  const std::string& content_type,
-                                 const std::string& body);
+                                 const std::string& body,
+                                 std::vector<std::string> headers);
 
 void send_response(SSL* ssl, std::string response);
 
 void send_http_response(SSL* ssl, http_status_t status,
                                const std::string& status_text,
                                const std::string& content_type,
-                               const std::string& body);
+                               const std::string& body,
+                               std::vector<std::string> headers);
 
 #endif // __HTTP_H__
