@@ -110,7 +110,19 @@ typedef struct route_node_t {
     callbacks_t callbacks;
 } route_node_t;
 
-// Parse a variable
+// Parse a variable from text
 route_variable_t parse_var(std::string arg);
+
+// Create a node in the route tree
+route_node_t *create_route_node(std::vector<route_node_t*> *route_nodes, route_node_t *parent, std::string name, bool is_static, route_variable_type_t var_type);
+
+// Create a static node without a variable substitution
+route_node_t *create_static_route_node(std::vector<route_node_t*> *route_nodes, route_node_t *parent, std::string name);
+
+// Create a node with variable substitution
+route_node_t *create_variable_route_node(std::vector<route_node_t*> *route_nodes, route_node_t *parent, std::string name, route_variable_type_t var_type);
+
+// Respond to a client request
+void handle_client(SSL* ssl, route_node_t *root_ptr);
 
 #endif // __ROUTE_H__

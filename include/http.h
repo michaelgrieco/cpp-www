@@ -31,6 +31,13 @@ typedef enum {
     HTTP_NOT_FOUND = 404,
 } http_status_t;
 
+// Map of HTTP statuses to the text value
+#define HTTP_STATUS_TEXT_MAP(name) static std::map<int, std::string> name = { \
+    { HTTP_OKAY, "OKAY" }, \
+    { HTTP_MOVED_PERMANENTLY, "Moved Permanently" }, \
+    { HTTP_NOT_FOUND, "Not Found" } \
+};
+
 // Content types
 
 void parse_query_args(char *buf, int i, int path_size, variables_t &vars);
@@ -41,12 +48,11 @@ std::string http_response(http_status_t status, const std::string& status_text,
                                  const std::string& body,
                                  std::vector<std::string> headers);
 
-void send_response(SSL* ssl, std::string response);
+inline void send_response(SSL* ssl, std::string response);
 
-void send_http_response(SSL* ssl, http_status_t status,
-                               const std::string& status_text,
-                               const std::string& content_type,
-                               const std::string& body,
-                               std::vector<std::string> headers);
+void send_http_response_status(SSL* ssl, http_status_t status);
+void send_http_response_headers(SSL* ssl, std::map<std::string, std::string> headers);
+void send_http_response_body(SSL* ssl, std::string content_type, std::string body);
+void send_http_response_file(SSL* ssl, std::string content_type, std::string path);
 
 #endif // __HTTP_H__
