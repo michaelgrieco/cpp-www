@@ -145,4 +145,5 @@ void send_http_response_file(SSL* ssl, std::string content_type, std::string pat
     while (f.read(block, sizeof(block)) || f.gcount() > 0) {
         send_response(ssl, std::string(block, f.gcount()));
     }
+    f.close();
 }

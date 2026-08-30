@@ -27,6 +27,37 @@ static constexpr char   KEY_FILE[]    = "certs/server.key";
 // ===== Callback functions =====
 // ==============================
 
+void get_file(SSL *ssl, variables_t vars, std::string body) {
+    (void)vars;
+    (void)body;
+    std::cout << "File callback" << std::endl;
+
+    // get file name and extension
+    std::string file_name = vars["file"].value.s;
+    std::string file_path = "www/" + file_name;
+    std::string file_type = "text/";
+    int dot_idx = file_name.find_last_of('.');
+    if (dot_idx == -1) {
+        file_type += "plain";
+    }
+    else {
+        file_type += file_name.substr(dot_idx + 1);
+    }
+    
+    // stream file
+    std::ifstream file(file_path);
+    if (file.good()) {
+        send_http_response_status(ssl, HTTP_OKAY);
+        send_http_response_headers(ssl, {});
+        send_http_response_file(ssl, file_type, file_path);
+    } else {
+        send_http_response_status(ssl, HTTP_NOT_FOUND);
+        send_http_response_headers(ssl, {});
+        send_http_response_body(ssl, "text", "404 Not Found");
+    }
+    file.close();
+}
+
 // index callback
 void index(SSL *ssl, variables_t vars, std::string body) {
     (void)vars;
@@ -140,6 +171,12 @@ static inline void construct_route_tree() {
     route_node_t *root_url = create_static_route_node(&route_nodes, nullptr, "index");
     root_ptr = root_url;
     root_url->callbacks.insert({HTTP_GET, index});
+
+    
+    // File endpoint
+    route_node_t *www_url = create_static_route_node(&route_nodes, root_url, "www");
+    route_node_t *file_url = create_variable_route_node(&route_nodes, www_url, "file", STRING);
+    file_url->callbacks.insert({HTTP_GET, get_file});
 
     // Example ID endpoint
     route_node_t *id_url = create_variable_route_node(&route_nodes, root_url, "id", INT);
