@@ -5,18 +5,135 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Hello, world!</title>
         <link rel="stylesheet" href="/www/bootstrap.min.css" />
+
+        <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', async () => {
+                // get form ID
+                const form = window.location.pathname.split('/').filter(Boolean).pop();
+                if (!form) return;
+
+                // get form description
+                const res = await fetch(`/www/forms/${form}.json`);
+                const data = await res.json();
+
+                document.getElementById('form-title').textContent = data.title;
+
+                const formEl = document.querySelector('form');
+                //formEl.action = `/form/${form}`;
+
+                for (const item of data.elements) {
+                    let el = undefined;
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'mb-3';
+
+                    if (item.element === 'input') {
+                        if (item.prompt) {
+                            const label = document.createElement('label');
+                            label.setAttribute('for', item.name);
+                            label.className = 'form-label';
+                            label.textContent = item.prompt;
+                            wrapper.appendChild(label);
+                        }
+
+                        if (item.long) {
+                            // Expandable long-form textarea
+                            el = document.createElement('textarea');
+                            el.name = item.name;
+                            el.id = item.name;
+                            el.className = 'form-control';
+                            el.rows = 4;
+                        } else if (item.type === 'checkbox' || item.type === 'radio') {
+                            // Group of checkbox / radio options
+                            for (const opt of (item.opts || [])) {
+                                const optWrapper = document.createElement('div');
+                                optWrapper.className = 'form-check';
+
+                                const optInput = document.createElement('input');
+                                optInput.type = item.type;
+                                optInput.name = item.name;
+                                optInput.id = `${item.name}-${opt}`;
+                                optInput.value = opt;
+                                optInput.className = 'form-check-input';
+
+                                const optLabel = document.createElement('label');
+                                optLabel.setAttribute('for', `${item.name}-${opt}`);
+                                optLabel.className = 'form-check-label';
+                                optLabel.textContent = opt;
+
+                                optWrapper.appendChild(optInput);
+                                optWrapper.appendChild(optLabel);
+                                wrapper.appendChild(optWrapper);
+                            }
+                            // attrs applied per-input above; skip the generic el path
+                            el = null;
+                        } else if (item.type === 'date') {
+                            el = document.createElement('input');
+                            el.type = 'date';
+                            el.name = item.name;
+                            el.id = item.name;
+                            el.className = 'form-control';
+                            // use placeholder as the default date value
+                            if (item.attrs && item.attrs.placeholder) {
+                                el.value = item.attrs.placeholder;
+                            }
+                        } else {
+                            el = document.createElement('input');
+                            el.type = item.type || 'text';
+                            el.name = item.name;
+                            el.id = item.name;
+                            el.className = 'form-control';
+                        }
+                    } else {
+                        el = document.createElement(item.element);
+                        if (item.text) el.textContent = item.text;
+                    }
+
+                    if (el) {
+                        if (item.attrs) {
+                            for (const [attr, value] of Object.entries(item.attrs)) {
+                                el.setAttribute(attr, value);
+                            }
+                        }
+                        wrapper.appendChild(el);
+                    }
+                    formEl.appendChild(wrapper)
+                }
+
+                // insert button
+                const btn = document.createElement('button');
+                btn.setAttribute("type", "submit");
+                btn.setAttribute("name", "submit");
+                btn.setAttribute("class", "btn btn-primary");
+                btn.textContent = "Submit"
+                formEl.appendChild(btn);
+
+                // intercept form submission
+                formEl.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    console.log("Posting");
+                    console.log(new FormData(formEl));
+                    const submitRes = await fetch(formEl.action, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams(new FormData(formEl)).toString()
+                    });
+                    console.log(submitRes);
+                    if (submitRes.status === 400 || submitRes.status === 404) {
+                        alert(await submitRes.text());
+                    } else {
+                        window.location.href = submitRes.url;
+                    }
+                });
+            });
+        </script>
     </head>
     <body>
         <div class="container mt-5">
             <div class="row justify-content-center">
                 <div class="col-md-6">
-                    <h5 class="mb-3">Form</h5>
+                    <h5 class="mb-3" id="form-title">Form Title</h5>
                     <form method="POST">
-                        <div class="mb-3">
-                            <label for="query1" class="form-label">Query</label>
-                            <input type="text" class="form-control" name="query1" id="query1" placeholder="Enter query" />
-                        </div>
-                        <button type="submit" name="submit" id="submit" class="btn btn-primary">Submit</button>
+                        
                     </form>
                 </div>
             </div>

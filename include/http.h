@@ -28,14 +28,18 @@
 typedef enum {
     HTTP_OKAY = 200,
     HTTP_MOVED_PERMANENTLY = 301,
+    HTTP_BAD_REQUEST = 400,
     HTTP_NOT_FOUND = 404,
+    HTTP_INTERNAL_ERROR = 500,
 } http_status_t;
 
 // Map of HTTP statuses to the text value
 #define HTTP_STATUS_TEXT_MAP(name) static std::map<int, std::string> name = { \
     { HTTP_OKAY, "OKAY" }, \
     { HTTP_MOVED_PERMANENTLY, "Moved Permanently" }, \
+    { HTTP_BAD_REQUEST, "Bad Request" }, \
     { HTTP_NOT_FOUND, "Not Found" } \
+    { HTTP_INTERNAL_ERROR, "Internal Server Error" } \
 };
 
 // Content types

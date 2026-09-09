@@ -9,6 +9,7 @@ TARGET    := app
 SRC_DIR   := src
 BUILD_DIR := build
 CERT_DIR  := certs
+CERT_DIR  := data
 
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(SRCS))
@@ -24,7 +25,7 @@ debug: certs $(TARGET)
 release: CXXFLAGS += -O2 -DNDEBUG
 release: certs $(TARGET)
 
-$(TARGET): $(OBJS)
+$(TARGET): $(OBJS) $(DATA_DIR)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
@@ -32,6 +33,10 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+# TODO create quota on this data directory
+$(DATA_DIR):
+	mkdir -p $(DATA_DIR)
 
 # Generate a self-signed certificate if one does not already exist.
 certs: $(CERT_DIR)/server.crt

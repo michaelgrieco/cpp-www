@@ -18,10 +18,31 @@
 #include "http.h"
 HTTP_STATUS_TEXT_MAP(http_status_text);
 
+// Decode a percent-encoded URL string (e.g. "hello%20world" -> "hello world").
+// '+' is treated as a space (application/x-www-form-urlencoded convention).
+static std::string url_decode(const std::string &s) {
+    std::string out;
+    out.reserve(s.size());
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '%' && i + 2 < s.size() &&
+            std::isxdigit((unsigned char)s[i+1]) &&
+            std::isxdigit((unsigned char)s[i+2]))
+        {
+            char hex[3] = { s[i+1], s[i+2], '\0' };
+            out += static_cast<char>(std::strtol(hex, nullptr, 16));
+            i += 2;
+        } else if (s[i] == '+') {
+            out += ' ';
+        } else {
+            out += s[i];
+        }
+    }
+    return out;
+}
+
 void parse_query_args(char *buf, int i, int path_size, variables_t &vars) {
     std::string var_name;
     int token_start_i = i;
-    std::cout << "parse_query_args " << i << " " << path_size << std::endl;
     for (; i <= path_size; ++i) {
         bool is_name = buf[i] == '=';
         if (is_name || buf[i] == '&' || buf[i] == '\0') {
@@ -29,11 +50,17 @@ void parse_query_args(char *buf, int i, int path_size, variables_t &vars) {
 
             if (is_name) {
                 // token is a key, store for later
-                var_name = std::string(buf + token_start_i);
+                var_name = url_decode(std::string(buf + token_start_i));
             }
             else {
-                route_variable_t var = parse_var(std::string(buf + token_start_i));
-                vars[var_name] = var;
+                std::string str = url_decode(std::string(buf + token_start_i));
+                route_variable_t var = parse_var(str);
+                if (vars.count(var_name) && vars[var_name].type == LIST) {
+                    vars[var_name].value.l->push_back(var);
+                }
+                else {
+                    vars[var_name] = var;
+                }
                 var_name = "";
             }
             
@@ -48,22 +75,29 @@ void parse_query_args(std::string buf, variables_t &vars) {
     int token_start_i = 0;
     int buf_size = (int)buf.size();
 
-    std::cout << "Parsing form body " << buf << std::endl;
-
     for (int i = 0; i <= buf_size; ++i) {
         bool is_name = buf[i] == '=';
         if (is_name || buf[i] == '&' || buf[i] == '\0') {
             int token_length = i - token_start_i;
-            buf[i] = '\0';
+            
+            if (token_length) {
+                buf[i] = '\0';
+                std::string decoded = url_decode(buf.substr(token_start_i, token_length));
 
-            if (is_name) {
-                // token is a key, store for later
-                var_name = buf.substr(token_start_i, token_length);
-            }
-            else {
-                route_variable_t var = parse_var(buf.substr(token_start_i, token_length));
-                vars[var_name] = var;
-                var_name = "";
+                if (is_name) {
+                    // token is a key, store for later
+                    var_name = decoded;
+                }
+                else {
+                    route_variable_t var = parse_var(decoded);
+                    if (vars.count(var_name) && vars[var_name].type == LIST) {
+                        vars[var_name].value.l->push_back(var);
+                    }
+                    else {
+                        vars[var_name] = var;
+                    }
+                    var_name = "";
+                }
             }
             
             // move to next token

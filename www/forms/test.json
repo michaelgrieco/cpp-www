@@ -1,0 +1,89 @@
+{
+    "title": "Form Title",
+    "elements": [
+        {
+            "element": "p",
+            "text": "This is the form description",
+            "attrs": {
+                "style": "font-weight: bold"
+            }
+        },
+        {
+            "element": "input",
+            "type": "text",
+            "prompt": "Who are you: ",
+            "name": "person",
+            "required": true,
+            "attrs": {
+                "placeholder": "Doja Cat"
+            }
+        },
+        {
+            "element": "input",
+            "type": "text",
+            "prompt": "Enter the field: ",
+            "name": "field1",
+            "required": true,
+            "attrs": {
+                "placeholder": "value1"
+            }
+        },
+        {
+            "element": "input",
+            "type": "text",
+            "prompt": "Enter another field: ",
+            "name": "fieldlong",
+            "long": true,
+            "required": true,
+            "attrs": {
+                "placeholder": "Enter the paragraph"
+            }
+        },
+        {
+            "element": "input",
+            "type": "checkbox",
+            "prompt": "Select many: ",
+            "name": "field2",
+            "required": false,
+            "opts": [
+                "opt1",
+                "opt2",
+                "opt3"
+            ]
+        },
+        {
+            "element": "input",
+            "type": "checkbox",
+            "prompt": "Select many numbers: ",
+            "name": "field_nums",
+            "required": true,
+            "opts": [
+                "1",
+                "2",
+                "3"
+            ]
+        },
+        {
+            "element": "input",
+            "type": "radio",
+            "prompt": "Select one: ",
+            "name": "field3",
+            "required": false,
+            "opts": [
+                "choice1",
+                "choice2",
+                "choice3"
+            ]
+        },
+        {
+            "element": "input",
+            "type": "date",
+            "prompt": "Select the date: ",
+            "name": "date1",
+            "required": true,
+            "attrs": {
+                "placeholder": "2027-10-08"
+            }
+        }
+    ]
+}
