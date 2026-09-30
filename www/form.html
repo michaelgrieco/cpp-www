@@ -3,8 +3,8 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Hello, world!</title>
-        <link rel="stylesheet" href="/www/bootstrap.min.css" />
+        <title>Fill out form</title>
+        <link rel="stylesheet" href="/www/assets/css/bootstrap.min.css" />
 
         <script type="text/javascript">
             document.addEventListener('DOMContentLoaded', async () => {
@@ -21,17 +21,16 @@
                 const formEl = document.querySelector('form');
                 //formEl.action = `/form/${form}`;
 
-                for (const item of data.elements) {
+                const createFormItem = (item, wrapper) => {
                     let el = undefined;
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'mb-3';
 
+                    // create form item
                     if (item.element === 'input') {
                         if (item.prompt) {
                             const label = document.createElement('label');
                             label.setAttribute('for', item.name);
                             label.className = 'form-label';
-                            label.textContent = item.prompt;
+                            label.innerHTML = item.prompt;
                             wrapper.appendChild(label);
                         }
 
@@ -45,23 +44,32 @@
                         } else if (item.type === 'checkbox' || item.type === 'radio') {
                             // Group of checkbox / radio options
                             for (const opt of (item.opts || [])) {
-                                const optWrapper = document.createElement('div');
-                                optWrapper.className = 'form-check';
+                                const optStr = typeof opt === 'string' ? opt : opt.text;
 
+                                const optWrapper = document.createElement('div');
+                                optWrapper.className = 'form-check px-4';
+
+                                // create checkbox or radio button
                                 const optInput = document.createElement('input');
                                 optInput.type = item.type;
                                 optInput.name = item.name;
-                                optInput.id = `${item.name}-${opt}`;
-                                optInput.value = opt;
+                                //optInput.id = `${item.name}-${opt}`;
+                                optInput.value = typeof opt === 'string' ? opt : opt.text;
                                 optInput.className = 'form-check-input';
-
-                                const optLabel = document.createElement('label');
-                                optLabel.setAttribute('for', `${item.name}-${opt}`);
-                                optLabel.className = 'form-check-label';
-                                optLabel.textContent = opt;
-
                                 optWrapper.appendChild(optInput);
-                                optWrapper.appendChild(optLabel);
+
+                                // create label
+                                if (typeof opt === 'string') {
+                                    const optLabel = document.createElement('label');
+                                    optLabel.setAttribute('for', `${item.name}-${opt}`);
+                                    optLabel.className = 'form-check-label';
+                                    optLabel.textContent = opt;
+                                    optWrapper.appendChild(optLabel);
+                                }
+                                else {
+                                    createFormItem(opt, optWrapper);
+                                }
+
                                 wrapper.appendChild(optWrapper);
                             }
                             // attrs applied per-input above; skip the generic el path
@@ -76,6 +84,72 @@
                             if (item.attrs && item.attrs.placeholder) {
                                 el.value = item.attrs.placeholder;
                             }
+                        } else if (item.type === 'select') {
+                            el = document.createElement('div');
+                            el.className = 'dropdown';
+                            el.id = item.name + '-dropdown';
+
+                            // Create input search box
+                            const searchInput = document.createElement('input');
+                            searchInput.type = 'text';
+                            searchInput.className = 'form-control';
+                            searchInput.placeholder = 'Search...';
+                            searchInput.setAttribute('autocomplete', 'off');
+
+                            // Wrapper to hold value
+                            const hiddenInput = document.createElement('input');
+                            hiddenInput.type = 'hidden';
+                            hiddenInput.name = item.name;
+                            hiddenInput.id = item.name;
+
+                            // Wrapper for options
+                            const dropdownMenu = document.createElement('div');
+                            dropdownMenu.className = 'dropdown-menu w-100';
+                            dropdownMenu.style.maxHeight = '200px';
+                            dropdownMenu.style.overflowY = 'auto';
+                            dropdownMenu.style.display = 'none';
+
+                            // Query available options
+                            const opts = item.opts || [];
+                            const renderOptions = (filter) => {
+                                dropdownMenu.innerHTML = '';
+                                const filtered = opts.filter(o => o.toLowerCase().includes(filter.toLowerCase()));
+                                for (const opt of filtered) {
+                                    const optEl = document.createElement('a');
+                                    optEl.className = 'dropdown-item';
+                                    optEl.href = '#';
+                                    optEl.textContent = opt;
+                                    optEl.addEventListener('mousedown', (e) => {
+                                        e.preventDefault();
+                                        searchInput.value = opt;
+                                        hiddenInput.value = opt;
+                                        dropdownMenu.style.display = 'none';
+                                    });
+                                    dropdownMenu.appendChild(optEl);
+                                }
+                            };
+
+                            // New search
+                            searchInput.addEventListener('input', () => {
+                                renderOptions(searchInput.value);
+                                dropdownMenu.style.display = 'block';
+                            });
+
+                            // Open menu
+                            searchInput.addEventListener('focus', () => {
+                                renderOptions(searchInput.value);
+                                dropdownMenu.style.display = 'block';
+                            });
+
+                            // Hide menu
+                            searchInput.addEventListener('blur', () => {
+                                dropdownMenu.style.display = 'none';
+                            });
+
+                            // Add input elements to wrapper
+                            el.appendChild(searchInput);
+                            el.appendChild(hiddenInput);
+                            el.appendChild(dropdownMenu);
                         } else {
                             el = document.createElement('input');
                             el.type = item.type || 'text';
@@ -85,9 +159,10 @@
                         }
                     } else {
                         el = document.createElement(item.element);
-                        if (item.text) el.textContent = item.text;
+                        if (item.text) el.innerHTML = item.text;
                     }
 
+                    // set attributes
                     if (el) {
                         if (item.attrs) {
                             for (const [attr, value] of Object.entries(item.attrs)) {
@@ -96,7 +171,18 @@
                         }
                         wrapper.appendChild(el);
                     }
-                    formEl.appendChild(wrapper)
+                    if (item.children) {
+                        for (const child of item.children) {
+                            createFormItem(child, wrapper);
+                        }
+                    }
+                };
+
+                for (const item of data.elements) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'mb-3 ' + item.wrapperClassName;
+                    createFormItem(item, wrapper);
+                    formEl.appendChild(wrapper);
                 }
 
                 // insert button
@@ -110,14 +196,11 @@
                 // intercept form submission
                 formEl.addEventListener('submit', async (e) => {
                     e.preventDefault();
-                    console.log("Posting");
-                    console.log(new FormData(formEl));
                     const submitRes = await fetch(formEl.action, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                         body: new URLSearchParams(new FormData(formEl)).toString()
                     });
-                    console.log(submitRes);
                     if (submitRes.status === 400 || submitRes.status === 404) {
                         alert(await submitRes.text());
                     } else {
@@ -133,7 +216,6 @@
                 <div class="col-md-6">
                     <h5 class="mb-3" id="form-title">Form Title</h5>
                     <form method="POST">
-                        
                     </form>
                 </div>
             </div>

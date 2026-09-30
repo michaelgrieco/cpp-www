@@ -26,6 +26,9 @@
 #ifndef __HTTP_SERVER_H__
 #define __HTTP_SERVER_H__
 
+#define MAX_REQ_SIZE (1<<20)
+
+// Virtual base for HTTP server
 class http_server {
 
 public:
@@ -41,6 +44,10 @@ public:
     
     // listen for requests
     void listen();
+
+    // Overridable function to customize the not found response
+    virtual void not_found(http_request_t request);
+    virtual void error(http_request_t request, http_status_t status, std::string msg);
     
 protected:
 
@@ -67,5 +74,25 @@ private:
     void handle_client(SSL* ssl, route_node_t *root_ptr);
 
 };
+
+// request information
+typedef struct http_request_t {
+    SSL                                *ssl;
+    http_server                        *server;
+    std::map<std::string, std::string> header_vars;
+    variables_t                        vars;
+    int                                bytes_read;
+    std::string                        body;
+    std::time_t                        req_time;
+} http_request_t;
+
+// read bytes
+int read_ssl_request(http_request_t &request, char *buf, int max_segment);
+
+// respond with a generic error
+void respond_error(http_request_t request, http_status_t status, std::string msg);
+
+// respond not found (HTTP 404) to a request
+void respond_not_found(http_request_t request);
 
 #endif // __HTTP_SERVER_H__

@@ -10,6 +10,8 @@ public:
 
     // inherit base constructors
     using http_server::http_server;
+    
+    void not_found(http_request_t request) override;
 
 protected:
 
@@ -21,11 +23,12 @@ private:
     // Callback functions
     static void get_file(http_request_t request);
     static void index(http_request_t request);
-    static void get_form(http_request_t request);
-    static void get_form_search(http_request_t request);
+    static void get_form_data(http_request_t request);
     static void form_search(http_request_t request);
     static void post_form(http_request_t request);
-    static void get_form_completion(http_request_t request);
+    static void post_secret(http_request_t request);
+    static void fetch_secret(http_request_t request);
+    static void post_secret_file(http_request_t request);
 
 };
 

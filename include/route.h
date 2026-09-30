@@ -23,7 +23,8 @@
 // Forward declarations
 struct route_node_t;
 struct route_variable_t;
-class http_server;
+typedef struct http_request_t http_request_t;
+//class http_server;
 
 // Types of variables in a URL route node
 enum route_variable_type_e {
@@ -84,15 +85,6 @@ public:
 typedef std::pair<std::string, route_variable_t> variable_entry_t;
 typedef std::map<std::string, route_variable_t> variables_t;
 
-// request information
-typedef struct {
-    SSL         *ssl;
-    http_server *server;
-    variables_t  vars;
-    std::string  body;
-    std::time_t  req_time;
-} http_request_t;
-
 // URL callback function
 typedef void(*callback_t)(http_request_t request);
 #define CALLBACK_USE_VARS() \
@@ -110,6 +102,7 @@ typedef struct route_node_t {
     route_variable_t variable;
     std::string name;
     std::vector<struct route_node_t*> children;
+    std::string get_request_file;
     callbacks_t callbacks;
     bool is_final_node = false;
 } route_node_t;

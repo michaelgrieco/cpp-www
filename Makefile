@@ -1,15 +1,22 @@
 # C++ Project Makefile
 
+TOTP_SECRET_FILE := $(HOME)/.totp.secret.h
+
 CXX      := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra -Wpedantic
+CXXFLAGS := -std=c++11 -Wall -Wextra -Wpedantic
+ifeq (,$(wildcard $(TOTP_SECRET_FILE)))
+$(warning Warning: $(TOTP_SECRET_FILE) not found, run `make totp` to generate the file.)
 INCLUDES := -I include
+else
+INCLUDES := -I include --include $(TOTP_SECRET_FILE)
+endif
 LDFLAGS  := -lssl -lcrypto
 
 TARGET    := app
 SRC_DIR   := src
 BUILD_DIR := build
 CERT_DIR  := certs
-CERT_DIR  := data
+DATA_DIR  := data
 
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(BUILD_DIR)/%.o, $(SRCS))
@@ -25,7 +32,11 @@ debug: certs $(TARGET)
 release: CXXFLAGS += -O2 -DNDEBUG
 release: certs $(TARGET)
 
-$(TARGET): $(OBJS) $(DATA_DIR)
+
+totp: $(TOTP_SECRET_FILE)
+	@echo "$$(tr -dc 'A-Z2-7' < /dev/urandom | head -c 32)" > $(TOTP_SECRET_FILE)
+
+$(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
@@ -37,11 +48,14 @@ $(BUILD_DIR):
 # TODO create quota on this data directory
 $(DATA_DIR):
 	mkdir -p $(DATA_DIR)
+	mkdir -p $(DATA_DIR)/form
+	mkdir -p $(DATA_DIR)/secret
+	mkdir -p $(DATA_DIR)/files
 
 # Generate a self-signed certificate if one does not already exist.
 certs: $(CERT_DIR)/server.crt
 
-$(CERT_DIR)/server.crt: | $(CERT_DIR)
+$(CERT_DIR)/server.crt:
 	openssl req -x509 -newkey rsa:2048 -keyout $(CERT_DIR)/server.key \
 	    -out $(CERT_DIR)/server.crt -days 365 -nodes \
 	    -subj "/CN=localhost"

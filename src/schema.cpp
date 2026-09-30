@@ -13,6 +13,7 @@ bool read_schema_file(std::string file_path, std::vector<schema_field_t> *out) {
         return false;
     }
 
+    // read base schema
     std::string line;
     while (std::getline(schema_file, line)) {
         schema_field_t entry;
@@ -24,8 +25,8 @@ bool read_schema_file(std::string file_path, std::vector<schema_field_t> *out) {
         std::string desc;
         std::getline(schema_file, desc);
         if (desc.length() != 2) continue;
-        entry.desc.optionality = (schema_field_desc_optionality_e)desc[0];
-        entry.desc.type = (schema_field_desc_type_e)desc[1];
+        entry.optionality = (schema_field_desc_optionality_e)desc[0];
+        entry.type = (schema_field_desc_type_e)desc[1];
 
         out->push_back(entry);
     }
@@ -35,5 +36,5 @@ bool read_schema_file(std::string file_path, std::vector<schema_field_t> *out) {
 }
 
 bool schema_field_is_list(schema_field_t field) {
-    return field.desc.type >= 'A' && field.desc.type <= 'Z';
+    return field.type >= 'A' && field.type <= 'Z';
 }

@@ -18,6 +18,7 @@ route_variable_t::route_variable_t(const route_variable_t& o) : type(o.type), va
         case INT:    value.i = o.value.i; break;
         case FLOAT:  value.f = o.value.f; break;
         case STRING: new (&value.s) std::string(o.value.s); break;
+        //case STRING: value.s = std::string(o.value.s); break;
         case LIST:   value.l = o.value.l; break;
         case MAP:    value.m = o.value.m; break;
         default:     break;
@@ -166,14 +167,16 @@ route_variable_t parse_var(std::string arg) {
 // Create a node in the route tree
 route_node_t *create_route_node(std::vector<route_node_t*> *route_nodes, route_node_t *parent, std::string name, bool is_static, route_variable_type_e var_type) {
     // create node structure
-    route_node_t *node = new route_node_t{
-        .is_static = is_static,
-        .variable = route_variable_t(var_type),
-        .name = name,
-        .children = {},
-        .callbacks = callbacks_t(),
-        .is_final_node = false
-    };
+    route_node_t *node = new route_node_t();
+    node->is_static = is_static;
+    node->variable = route_variable_t();
+    node->variable.type = var_type;
+    node->name = name;
+    node->children = {};
+    node->get_request_file = "";
+    node->callbacks = callbacks_t();
+    node->is_final_node = false;
+
     node->children.reserve(64);
     route_nodes->push_back(node);
 

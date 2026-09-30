@@ -19,21 +19,17 @@ enum schema_field_desc_type_e {
     SCHEMA_TYPE_NUMBER = 'n',
     SCHEMA_TYPE_STRING = 's',
     SCHEMA_TYPE_DATE = 'd',
+    SCHEMA_TYPE_FILE = 'f',
     SCHEMA_TYPE_NUMBER_LIST = 'N',
     SCHEMA_TYPE_STRING_LIST = 'S',
     SCHEMA_TYPE_DATE_LIST = 'D'
 };
 
-// 
-typedef struct {
-    schema_field_desc_optionality_e optionality;
-    schema_field_desc_type_e type;
-} schema_field_desc_t;
-
-//
+// Fields to parse and manipulate
 typedef struct {
     std::string name;
-    schema_field_desc_t desc;
+    schema_field_desc_optionality_e optionality;
+    schema_field_desc_type_e type;
 } schema_field_t;
 
 bool read_schema_file(std::string file_path, std::vector<schema_field_t> *out);

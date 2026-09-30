@@ -65,26 +65,40 @@ void http_server::listen() {
 }
 
 // Respond to a client request
+#define BUF_SIZE 2048
 void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
-    std::ostringstream error_ss;
     const auto now = std::chrono::system_clock::now();
     std::time_t req_time = std::chrono::system_clock::to_time_t(now);
 
+    http_request_t request = {
+        /*.ssl =*/ ssl,
+        /*.server =*/ this,
+        /*.header_vars =*/ std::map<std::string, std::string>(),
+        /*.vars =*/ variables_t(),
+        /*.bytes_read =*/ 0,
+        /*.body =*/ "",
+        /*.req_time =*/ req_time
+    };
+
     // Read until we have at least the request line.
     std::string buf;
-    buf.reserve(2048);
-    char tmp[512];
+    buf.reserve(BUF_SIZE);
+    char tmp[BUF_SIZE+1];
     // Read until we have the full HTTP headers (ends with \r\n\r\n)
     while (buf.find("\r\n\r\n") == std::string::npos) {
-        int n = SSL_read(ssl, tmp, static_cast<int>(sizeof(tmp) - 1));
-        if (n <= 0) return;
-        tmp[n] = '\0';
+        int n = read_ssl_request(request, tmp, BUF_SIZE);
+        if (n == -2) {
+            std::cout << "Request grew too large: " << request.bytes_read << std::endl;
+            return;
+        }
+        else if (n <= 0) {
+            break;
+        }
         buf += tmp;
     }
 
     // Parse all HTTP headers into header_vars (lower-cased name -> value)
     std::size_t header_end = buf.find("\r\n\r\n") + 4;
-    std::map<std::string, std::string> header_vars;
 
     // Skip the request line, then iterate over each header line
     std::size_t pos = buf.find("\r\n");
@@ -98,34 +112,56 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
 
         // get header name as lower case
         std::string name = buf.substr(pos, colon - pos);
-        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        for (int i = 0; i < (int)name.length(); ++i) {
+            char c = name[i];
+            if (c >= 'A' && c <= 'Z') {
+                name[i] = 'a' + (c - 'A');
+            }
+        }
 
         // get header value without leading whitespace
         std::size_t val_start = colon + 1;
         while (val_start < line_end && buf[val_start] == ' ') ++val_start;
         std::string value = buf.substr(val_start, line_end - val_start);
 
-        header_vars[name] = value;
+        request.header_vars[name] = value;
         pos = line_end;
     }
 
     // Parse content length
     int content_length = 0;
-    if (header_vars.count("content-length")) {
-        content_length = std::stoi(header_vars["content-length"]);
+    if (request.header_vars.count("content-length")) {
+        content_length = std::stoi(request.header_vars["content-length"]);
     }
 
+    // Test content type
+    bool is_multipart_form =
+        request.header_vars.count("content-type") &&
+        request.header_vars["content-type"].find("multipart/form-data") == 0;
+
     // Read the body if Content-Length indicates there is one
-    std::string body;
-    body.reserve(2048);
-    int body_bytes_read = static_cast<int>(buf.size()) - static_cast<int>(header_end);
-    body += buf.substr(header_end);
-    while (body_bytes_read < content_length) {
-        int n = SSL_read(ssl, tmp, static_cast<int>(sizeof(tmp) - 1));
-        if (n <= 0) break;
-        tmp[n] = '\0';
-        body += tmp;
-        body_bytes_read += n;
+    if (content_length) {
+        if (is_multipart_form) {
+            request.body += buf.substr(header_end);
+        }
+        else {
+            request.body.reserve(BUF_SIZE);
+            int body_bytes_read = static_cast<int>(buf.size()) - static_cast<int>(header_end);
+            request.body += buf.substr(header_end);
+            while (body_bytes_read < content_length) {
+                int n = read_ssl_request(request, tmp, BUF_SIZE);
+                if (n == -2) {
+                    std::cout << "Request grew too large: " << request.bytes_read << std::endl;
+                    return;
+                }
+                else if (n <= 0) {
+                    break;
+                }
+                tmp[n] = '\0';
+                request.body += tmp;
+                body_bytes_read += n;
+            }
+        }
     }
 
     // Parse the request line: METHOD <SP> path <SP> HTTP/x.x
@@ -146,7 +182,6 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
     int i = 1;
     int token_start_i = 1;
     int token_length;
-    variables_t vars;
     for (; i <= path_size; ++i) {
         // test for end of a complete token
         bool is_query_start = tmp[i] == '?';
@@ -163,7 +198,6 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
             std::string token = std::string(tmp + token_start_i);
             route_variable_t var = parse_var(token);
             for (auto node : dst->children) {
-                //route_node_t *node = *iter;
                 // compare strings
                 if (node->is_static &&
                     token_length == (int)node->name.size() &&
@@ -174,8 +208,8 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
                 }
 
                 // check type equivalence for route variable
-                else if (node->variable.type == var.type) {
-                    vars[node->name] = var;
+                else if (!node->is_static && node->variable.type == var.type) {
+                    request.vars[node->name] = var;
                     dst = node;
                     break;
                 }
@@ -197,8 +231,13 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
                 }
 
                 // save rest of URL as a variable
-                tmp[i] = '\0';
-                vars[dst->name] = std::string(tmp + token_start_i);
+                if (token_start_i >= path_size) {
+                    request.vars[dst->name] = std::string();
+                }
+                else {
+                    tmp[i] = '\0';
+                    request.vars[dst->name] = std::string(tmp + token_start_i);
+                }
 
                 // restore character for query string parsing
                 tmp[i] = c;
@@ -213,20 +252,63 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
     }
 
     // get query string
-    parse_query_args(tmp, i, path_size, vars);
+    parse_query_args(tmp, i, path_size, request.vars);
 
     // callback
-    if (dst && dst->callbacks.count(method)) {
-        http_request_t request = { ssl, this, vars, body, req_time };
-        dst->callbacks.operator[](method)(request);
-
-        std::string error_string = error_ss.str();
-        if (error_string.length() > 0) {
-            std::cout << "Error detected" << std::endl;
+    if (dst) {
+        if (dst->callbacks.count(method)) {
+            dst->callbacks.operator[](method)(request);
+            return;
+        }
+        else if (method == HTTP_GET && dst->get_request_file != "") {
+            send_http_response_status(ssl, HTTP_OKAY);
+            send_http_response_headers(ssl, {});
+            send_http_response_file(ssl, "text/html", dst->get_request_file);
+            return;
         }
     }
-    else {
-        send_http_response_status(ssl, HTTP_NOT_FOUND);
-        send_http_response_body(ssl, "text/plain", "404 Not Found, try something else");
+
+    not_found(request);
+}
+
+void http_server::not_found(http_request_t request) {
+    send_http_response_status(request.ssl, HTTP_NOT_FOUND);
+    send_http_response_body(request.ssl, "text/plain", "404 Not Found, try something else");
+}
+
+void http_server::error(http_request_t request, http_status_t status, std::string msg) {
+    send_http_response_status(request.ssl, status);
+    send_http_response_body(request.ssl, "text/plain", msg);
+}
+
+
+int read_ssl_request(http_request_t &request, char *buf, int max_segment) {
+    int n = SSL_read(request.ssl, buf, max_segment);
+    if (!n) {
+        // End of request
+        return 0;
     }
+    else if (n < 0) {
+        // Error in request
+        return -1;
+    }
+    else {
+        // Valid buffer read
+        buf[n] = '\0';
+        request.bytes_read += n;
+        if (request.bytes_read > MAX_REQ_SIZE) {
+            std::cout << "read_ssl_request::Large request" << std::endl;
+            respond_error(request, HTTP_BAD_REQUEST, "Request too large");
+            return -2;
+        }
+        return n;
+    }
+}
+
+void respond_error(http_request_t request, http_status_t status, std::string msg) {
+    request.server->error(request, status, msg);
+}
+
+void respond_not_found(http_request_t request) {
+    request.server->not_found(request);
 }

@@ -21,6 +21,17 @@
         {
             "element": "input",
             "type": "text",
+            "prompt": "Phone number: ",
+            "name": "number",
+            "required": true,
+            "validate": true,
+            "attrs": {
+                "placeholder": "212-123-4567"
+            }
+        },
+        {
+            "element": "input",
+            "type": "text",
             "prompt": "Enter the field: ",
             "name": "field1",
             "required": true,

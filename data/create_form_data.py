@@ -1,6 +1,8 @@
 import json
 import csv
+import os
 from sys import argv
+from time import asctime
 
 
 def infer_type(element):
@@ -40,11 +42,17 @@ def field_code(required_flag, type_str, is_list):
 
 if __name__ == "__main__":
     fname = argv[1]
-    json_path = f"www/forms/{fname}.json"
-    csv_path = f"data/{fname}.csv"
-    fields_path = f"data/{fname}.fields"
 
-    with open(json_path) as f:
+    dirpath = f"data/forms/{fname}"
+    validation_dirpath = f"{dirpath}/validation"
+    os.makedirs(dirpath, exist_ok=True)
+    os.makedirs(validation_dirpath, exist_ok=True)
+
+    json_path = f"www/forms/{fname}.json"
+    csv_path = f"{dirpath}/results.csv"
+    fields_path = f"{dirpath}/fields.txt"
+
+    with open(json_path, "r") as f:
         form = json.load(f)
 
     # Collect only input elements that have a name
@@ -53,7 +61,7 @@ if __name__ == "__main__":
         if el.get("element") == "input" and "name" in el
     ]
 
-    # Build field list: prepend the synthetic __time__ field
+    # Field list
     fields = []
 
     # __time__: required date, marker 'a'
@@ -64,17 +72,38 @@ if __name__ == "__main__":
         "req_char": "a",
     })
 
+    # Iterate through elements
     for el in inputs:
         type_str, is_list = infer_type(el)
+        name = el.get("name")
         required = el.get("required", False)
+        validate = el.get("validate", False)
         req_char = "r" if required else "o"
         fields.append({
-            "name": el["name"],
+            "name": name,
             "type": type_str,
             "is_list": is_list,
             "req_char": req_char,
         })
 
+        # add validation
+        if validate or "opts" in el:
+            validation_path = f"{validation_dirpath}/{name}.txt"
+            with open(validation_path, "w") as f:
+                f.write(f"# ENTER VALID VALUES FOR {name} BELOW THIS LINE\n")
+                opts = el.get("opts", [])
+                if len(opts) > 0:
+                    for opt in opts:
+                        if isinstance(opt, str):
+                            f.write(opt + "\n")
+                        else:
+                            f.write(opt['text'] + "\n")
+
+    if os.path.exists(csv_path):
+        now = asctime().replace(" ", "_").replace(":", "_")
+        backup_path = f"{csv_path}.{now}.csv"
+        print(f"Moving {csv_path} to {backup_path}")
+        os.rename(csv_path, backup_path)
     # Write CSV header
     with open(csv_path, "w", newline="") as f:
         writer = csv.writer(f)
