@@ -115,6 +115,13 @@ void home_http_server::index(http_request_t request) {
     send_http_response_file(request.ssl, "text/html", "www/index.html");
 }
 
+void home_http_server::my_redirect(http_request_t request) {
+    std::cout << "my_redirect" << std::endl;
+    send_http_response_status(request.ssl, HTTP_MOVED_PERMANENTLY);
+    send_http_response_headers(request.ssl, {{"Location", "/form/beerio_kart_dc"}});
+    send_http_response_body(request.ssl, "text", "");
+}
+
 // =================
 // ===== Forms =====
 // =================
@@ -494,6 +501,10 @@ void home_http_server::construct_route_tree() {
     std::cout << "root_url: " << (void*)root_url << std::endl;
     root_ptr = root_url;
     root_url->callbacks.insert({HTTP_GET, index});
+
+    route_node_t *redirect = create_static_route_node(&route_nodes, root_url, "kart");
+    std::cout << "redirect: " << (void*)redirect << std::endl;
+    redirect->callbacks.insert({HTTP_GET, my_redirect});
     
     // File endpoint
     route_node_t *www_url = create_final_static_route_node(&route_nodes, root_url, "www");

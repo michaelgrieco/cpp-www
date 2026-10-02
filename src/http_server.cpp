@@ -52,15 +52,18 @@ void http_server::listen() {
         SSL* ssl = SSL_new(g_ctx);
         SSL_set_fd(ssl, client_fd);
 
-        if (SSL_accept(ssl) <= 0) {
-            ERR_print_errors_fp(stderr);
+        int ssl_err = SSL_accept(ssl);
+        //std::cout << "SSL_accept returned " << ssl_err << std::endl;
+        if (ssl_err <= 0) {
+            //ERR_print_errors_fp(stderr);
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
         } else {
             handle_client(ssl, root_ptr);
+            SSL_shutdown(ssl);
+            SSL_free(ssl);
+            close(client_fd);
         }
-
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
-        close(client_fd);
     }
 }
 
@@ -196,6 +199,7 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
 
             // search in available endpoints (first matching endpoint has priority)
             std::string token = std::string(tmp + token_start_i);
+            route_node_t *next_dst = nullptr;
             route_variable_t var = parse_var(token);
             for (auto node : dst->children) {
                 // compare strings
@@ -203,20 +207,21 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
                     token_length == (int)node->name.size() &&
                     token == node->name
                 ) {
-                    dst = node;
+                    next_dst = node;
                     break;
                 }
 
                 // check type equivalence for route variable
                 else if (!node->is_static && node->variable.type == var.type) {
                     request.vars[node->name] = var;
-                    dst = node;
+                    next_dst = node;
                     break;
                 }
             }
             
             // move to next token
             token_start_i = i + 1;
+            dst = next_dst;
             if (!dst) break;
 
             // test if should skip scanning the rest of the route

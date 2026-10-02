@@ -1,15 +1,20 @@
 # C++ Project Makefile
 
 TOTP_SECRET_FILE := $(HOME)/.totp.secret.h
+ifeq (,$(wildcard $(TOTP_SECRET_FILE)))
+$(warning Warning: TOTP file not found, run `make totp` to generate the file.)
+TOTP_INCLUDE :=
+else
+TOTP_INCLUDE := --include $(TOTP_SECRET_FILE)
+endif
+
+ifeq (,$(DOMAIN))
+$(error Error: Cannot find a domain name for which to generate the SSL certificates.)
+endif
 
 CXX      := g++
 CXXFLAGS := -std=c++11 -Wall -Wextra -Wpedantic
-ifeq (,$(wildcard $(TOTP_SECRET_FILE)))
-$(warning Warning: $(TOTP_SECRET_FILE) not found, run `make totp` to generate the file.)
-INCLUDES := -I include
-else
-INCLUDES := -I include --include $(TOTP_SECRET_FILE)
-endif
+INCLUDES := -I include $(TOTP_INCLUDE)
 LDFLAGS  := -lssl -lcrypto
 
 TARGET    := app
@@ -56,9 +61,15 @@ $(DATA_DIR):
 certs: $(CERT_DIR)/server.crt
 
 $(CERT_DIR)/server.crt:
+	mkdir -p $(CERT_DIR)
 	openssl req -x509 -newkey rsa:2048 -keyout $(CERT_DIR)/server.key \
 	    -out $(CERT_DIR)/server.crt -days 365 -nodes \
-	    -subj "/CN=localhost"
+	    -subj "/CN=$(DOMAIN)"
+
+#_acme-challenge.grieco.tplinkdns.com
+cert-test:
+	./acme.sh --issue --dns -d $(DOMAIN)--yes-I-know-dns-manual-mode-enough-go-ahead-please
+	./acme.sh --renew -d $(DOMAIN) --yes-I-know-dns-manual-mode-enough-go-ahead-please
 
 $(CERT_DIR):
 	mkdir -p $(CERT_DIR)
@@ -66,4 +77,4 @@ $(CERT_DIR):
 -include $(DEPS)
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILD_DIR) $(TARGET) $(CERT_DIR)
