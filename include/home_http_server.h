@@ -23,6 +23,7 @@ private:
     // Callback functions
     static void get_file(http_request_t request);
     static void index(http_request_t request);
+    static void my_redirect(http_request_t request);
     static void get_form_data(http_request_t request);
     static void form_search(http_request_t request);
     static void post_form(http_request_t request);
