@@ -59,7 +59,11 @@ void http_server::listen() {
             SSL_shutdown(ssl);
             SSL_free(ssl);
         } else {
-            handle_client(ssl, root_ptr);
+            try {
+                handle_client(ssl, root_ptr);
+            } catch (const std::exception &e) {
+                std::cout << "  Error handling client: " << e.what() << std::endl;
+            }
             SSL_shutdown(ssl);
             SSL_free(ssl);
             close(client_fd);
@@ -131,16 +135,21 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
         pos = line_end;
     }
 
+    #define HEADER_CONTENT_LENGTH "content-length"
+    #define HEADER_CONTENT_TYPE "content-type"
+    #define HEADER_USER_AGENT "user-agent"
+    #define HEADER_ACCEPT_LANGUAGE "accept-language"
+
     // Parse content length
     int content_length = 0;
-    if (request.header_vars.count("content-length")) {
-        content_length = std::stoi(request.header_vars["content-length"]);
+    if (request.header_vars.count(HEADER_CONTENT_LENGTH)) {
+        content_length = std::stoi(request.header_vars[HEADER_CONTENT_LENGTH]);
     }
 
     // Test content type
     bool is_multipart_form =
-        request.header_vars.count("content-type") &&
-        request.header_vars["content-type"].find("multipart/form-data") == 0;
+        request.header_vars.count(HEADER_CONTENT_TYPE) &&
+        request.header_vars[HEADER_CONTENT_TYPE].find("multipart/form-data") == 0;
 
     // Read the body if Content-Length indicates there is one
     if (content_length) {
@@ -174,6 +183,25 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
     std::string method, path, version;
     ss >> method >> path >> version;
     std::cout << time_str << ": HTTP " << method << " to " << path << std::endl;
+
+    // Validate headers
+    for (std::pair<std::string, std::string> p : request.header_vars) {
+        std::cout << "  " << p.first << " = " << p.second << std::endl;
+    }
+    if (!((
+        request.header_vars.count(HEADER_USER_AGENT) &&
+        request.header_vars[HEADER_USER_AGENT].find("Mozilla") == 0
+    ) && (
+        request.header_vars.count(HEADER_ACCEPT_LANGUAGE) && (
+            request.header_vars[HEADER_ACCEPT_LANGUAGE][0] == '*' || (
+                request.header_vars[HEADER_ACCEPT_LANGUAGE][0] >= 'a' &&
+                request.header_vars[HEADER_ACCEPT_LANGUAGE][0] <= 'z'
+            )
+        )
+    ))) {
+        //not_found(request);
+        return;
+    }
 
     // copy path into buffer
     int path_size = path.size();

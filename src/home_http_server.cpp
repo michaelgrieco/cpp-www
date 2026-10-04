@@ -96,6 +96,7 @@ void home_http_server::get_file(http_request_t request) {
 
 // index callback
 void home_http_server::index(http_request_t request) {
+/*
     std::cout << "  Index callback" << std::endl;
 
     std::cout << "  Variables:" << std::endl;
@@ -109,6 +110,7 @@ void home_http_server::index(http_request_t request) {
     for (variable_entry_t entry : form_vars) {
         std::cout << "    " << entry.first << ": " << entry.second.to_string() << std::endl;
     }
+*/
 
     send_http_response_status(request.ssl, HTTP_OKAY);
     send_http_response_headers(request.ssl, {});
@@ -564,5 +566,5 @@ void home_http_server::construct_route_tree() {
     route_node_t *get_secret = create_variable_route_node(&route_nodes, create_secret_form, "secret", STRING);
     std::cout << "get_secret: " << (void*)get_secret << std::endl;
     get_secret->callbacks.insert({HTTP_GET, fetch_secret});
-    
+
 }

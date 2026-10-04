@@ -2,7 +2,6 @@
 
 rm -rf certs/*
 make debug
-exit
 ret=1
 while [[ $ret != 0 ]]; do
     ./app 8443
