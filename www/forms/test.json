@@ -95,6 +95,18 @@
             "attrs": {
                 "placeholder": "2027-10-08"
             }
+        },
+        {
+            "element": "input",
+            "type": "select",
+            "prompt": "Select from the following: ",
+            "name": "combo1",
+            "required": true,
+            "opts": [
+                "combo1",
+                "combo2",
+                "combo3"
+            ]
         }
     ]
 }

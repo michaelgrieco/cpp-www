@@ -3,9 +3,9 @@
 TOTP_SECRET_FILE := $(HOME)/.totp.secret.h
 ifeq (,$(wildcard $(TOTP_SECRET_FILE)))
 $(warning Warning: TOTP file not found, run `make totp` to generate the file.)
-TOTP_INCLUDE :=
+TOTP_FLAGS :=
 else
-TOTP_INCLUDE := --include $(TOTP_SECRET_FILE)
+TOTP_FLAGS := "-DTOTP_SECRET_FILE=\"$(TOTP_SECRET_FILE)\""
 endif
 
 ifeq (,$(DOMAIN))
@@ -13,7 +13,7 @@ $(error Error: Cannot find a domain name for which to generate the SSL certifica
 endif
 
 CXX      := g++
-CXXFLAGS := -std=c++11 -Wall -Wextra -Wpedantic
+CXXFLAGS := -std=c++11 -Wall -Wextra -Wpedantic $(TOTP_FLAGS)
 INCLUDES := -I include $(TOTP_INCLUDE)
 LDFLAGS  := -lssl -lcrypto
 
@@ -37,9 +37,9 @@ debug: certs $(TARGET)
 release: CXXFLAGS += -O2 -DNDEBUG
 release: certs $(TARGET)
 
-
-totp: $(TOTP_SECRET_FILE)
+$(TOTP_SECRET_FILE):
 	@echo "$$(tr -dc 'A-Z2-7' < /dev/urandom | head -c 32)" > $(TOTP_SECRET_FILE)
+totp: $(TOTP_SECRET_FILE)
 
 $(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)

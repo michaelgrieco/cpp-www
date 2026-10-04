@@ -4,8 +4,6 @@
 #include <string>
 #include <cstdint>
 
-#define TOTP_SECRET_FILE "~/.totp.secret"
-
 enum totp_security_level_e {
     TOTP_ADMIN,
     TOTP_FILE_UPLOADER,
