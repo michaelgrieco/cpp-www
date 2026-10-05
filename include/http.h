@@ -59,8 +59,9 @@ void parse_query_args(std::string buf, variables_t &vars);
 // File fields (SCHEMA_TYPE_FILE) are streamed to a temp file under `upload_dir`
 // and stored as "filename=<original name>;path=<saved path>".
 // Returns the map of field name -> value/metadata strings.
-std::map<std::string, std::string> parse_multipart_args(
+void parse_multipart_args(
     http_request_t &request,
+    std::map<std::string, std::string> &result,
     const std::map<std::string, schema_field_t> &schema,
     const std::string &upload_dir = "data/uploads");
 

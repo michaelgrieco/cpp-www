@@ -166,15 +166,12 @@ static std::string extract_boundary(const std::string &content_type) {
     return content_type.substr(pos, end == std::string::npos ? std::string::npos : end - pos);
 }
 
-std::map<std::string, std::string> parse_multipart_args(
+void parse_multipart_args(
     http_request_t &request,
+    std::map<std::string, std::string> &result,
     const std::map<std::string, schema_field_t> &schema,
     const std::string &upload_dir)
 {
-    std::cout << "  parse_multipart_args" << std::endl;
-
-    std::map<std::string, std::string> result;
-
     // --- Extract boundary --------------------------------------------------
     std::string content_type = "";
     if (request.header_vars.count("content-type"))
@@ -183,12 +180,10 @@ std::map<std::string, std::string> parse_multipart_args(
     if (request.header_vars.count("content-length")) {
         content_length = std::stoi(request.header_vars["content-length"]);
     }
-    std::cout << "content-length is " << content_length << std::endl;
 
     std::string boundary = extract_boundary(content_type);
     if (boundary.empty()) {
-        std::cout << "  parse_multipart_args: no boundary found in Content-Type" << std::endl;
-        return result;
+        return;
     }
 
     // The wire delimiter prefixes boundary with "--"
@@ -209,21 +204,17 @@ std::map<std::string, std::string> parse_multipart_args(
     // Seed buf with already-buffered body bytes (headers were stripped by
     // handle_client; request.body holds anything read after the header block).
     std::string buf = request.body;
-    std::cout << "To start, buf (" << buf.length() << ") has " << buf << std::endl;
 
     // Helper: refill buf until it contains at least `needed` bytes or EOF.
     // Never reads more than content_length total bytes from the stream.
     int total_read = (int)buf.size(); // bytes already seeded from request.body
     auto refill = [&](std::size_t needed) {
-        std::cout << "Refill called for " << (int)needed << " bytes" << std::endl;
         while (buf.size() < needed && total_read < content_length) {
             int want = (int)std::min(
                 (std::size_t)READ_BUF,
                 (std::size_t)(content_length - total_read)
             );
-            std::cout << "Grabbing " << want << " bytes" << std::endl;
             int n = read_ssl_request(request, tmp, want);
-            std::cout << "Read " << n << " bytes" << std::endl;
             if (n <= 0) break;
             buf.append(tmp, n);
             total_read += n;
@@ -231,12 +222,10 @@ std::map<std::string, std::string> parse_multipart_args(
     };
 
     // Advance past the first boundary line ("\r\n" + delim + "\r\n" or just delim + "\r\n")
-    std::cout << "Trying to grab " << ((int)delim.size() + 4) << " bytes" << std::endl;
     refill(delim.size() + 4);
     std::size_t pos = buf.find(delim);
     if (pos == std::string::npos) {
         std::cout << "  parse_multipart_args: opening boundary not found" << std::endl;
-        return result;
     }
     pos += delim.size();
     // skip \r\n after delimiter
@@ -391,8 +380,6 @@ std::map<std::string, std::string> parse_multipart_args(
         refill(pos + delim_end.size());
         if (buf.compare(pos, 2, "--") == 0) break;
     }
-
-    return result;
 }
 
 // ===============================

@@ -303,24 +303,13 @@ void home_http_server::get_form_data(http_request_t request) {
     std::string form_id = request.vars["id"].value.s;
     std::cout << "Get form data for " << form_id << std::endl;
 
-    // read secret
-    std::string totp_secret;
-    std::ifstream totp_secret_file(TOTP_SECRET_FILE);
-    if (totp_secret_file.good()) {
-        std::getline(totp_secret_file, totp_secret);
-    } else {
-        send_http_response_status(request.ssl, HTTP_UNAUTHORIZED);
-        send_http_response_headers(request.ssl, {});
-        send_http_response_body(request.ssl, "text/html", "<p>Bad OTP</p>");
-        return;
-    }
-
-    // authenticate
     variables_t form_vars;
     parse_query_args(request.body, form_vars);
-    std::string totp = form_vars["totp"].to_string();
-    std::cout << "TOTP is " << totp << std::endl;
-    if (!validate_totp(totp, totp_secret)) {
+
+    // validate OTP secret
+    totp_security_level_e level = validate_totp_permissions(form_vars["totp"], TOTP_DATA_READER);
+    std::cout << "Returned level " << level << std::endl;
+    if (level == TOTP_UNAUTHORIZED) {
         send_http_response_status(request.ssl, HTTP_UNAUTHORIZED);
         send_http_response_headers(request.ssl, {});
         send_http_response_body(request.ssl, "text/html", "<p>Bad OTP</p>");
@@ -347,18 +336,16 @@ void home_http_server::get_form_data(http_request_t request) {
 
 void home_http_server::post_secret_file(http_request_t request) {
     // parse form
-    std::map<std::string, std::string> form = parse_multipart_args(request, {
-        { "otp",  { "otp",  SCHEMA_OPTIONALITY_REQUIRED, SCHEMA_TYPE_STRING } },
+    std::map<std::string, std::string> form;
+    parse_multipart_args(request, form, {
+        { "totp", { "totp",  SCHEMA_OPTIONALITY_REQUIRED, SCHEMA_TYPE_STRING } },
         { "file", { "file", SCHEMA_OPTIONALITY_REQUIRED, SCHEMA_TYPE_FILE   } }
     });
 
     // validate OTP secret
-    std::string totp_secret;
-    std::ifstream totp_secret_file(TOTP_SECRET_FILE);
-    if (totp_secret_file.good()) {
-        std::getline(totp_secret_file, totp_secret);
-        std::cout << "Compare input " << form["otp"] << " to " << totp_secret << std::endl;
-    } else {
+    totp_security_level_e level = validate_totp_permissions(form["totp"], TOTP_ADMIN | TOTP_FILE_UPLOADER);
+    std::cout << "Returned level " << level << std::endl;
+    if (level == TOTP_UNAUTHORIZED) {
         send_http_response_status(request.ssl, HTTP_UNAUTHORIZED);
         send_http_response_headers(request.ssl, {});
         send_http_response_body(request.ssl, "text/html", "<p>Bad OTP</p>");
