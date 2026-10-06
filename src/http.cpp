@@ -410,6 +410,7 @@ void send_http_response_status(SSL* ssl, http_status_t status) {
     std::string status_text = http_status_text[status];
     buf << "HTTP/1.1 " << status << " " << status_text << "\r\n"
         << "Connection: close\r\n";
+    std::cout << "  HTTP/1.1 " << status << ": " << status_text << std::endl;
     std::string str = buf.str();
     send_response(ssl, str);
 }
