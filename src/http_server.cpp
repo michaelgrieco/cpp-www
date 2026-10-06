@@ -3,11 +3,14 @@
 
 #include <chrono>
 #include <ctime>
+#include <set>
 
 #include "http.h"
 #include "ssl.h"
 #include "schema.h"
 #include "route.h"
+
+HTTP_METHOD_SET(http_method_set);
 
 // =======================================
 // ===== Base server-level functions =====
@@ -30,7 +33,11 @@ void http_server::construct() {
         g_listen_fd = create_listen_socket(port);
     }
 
+#ifdef DOMAIN
+    std::cout << "Listening on https://" << DOMAIN << ':' << port << std::endl;
+#else
     std::cout << "Listening on https://localhost:" << port << std::endl;
+#endif
 
     // reserve memory
     route_nodes.reserve(64);
@@ -135,10 +142,51 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
         pos = line_end;
     }
 
-    #define HEADER_CONTENT_LENGTH "content-length"
-    #define HEADER_CONTENT_TYPE "content-type"
-    #define HEADER_USER_AGENT "user-agent"
-    #define HEADER_ACCEPT_LANGUAGE "accept-language"
+    // =============================
+    // ===== Header processing =====
+    // =============================
+
+    // Parse the request line: METHOD <SP> path <SP> HTTP/x.x
+    char *time_str = std::ctime(&req_time);
+    time_str[24] = '\0';
+    std::istringstream ss(buf);
+    std::string method, path, version;
+    ss >> method >> path >> version;
+    if (!http_method_set.count(method)) {
+        return;
+    }
+    std::cout << time_str << ": HTTP " << method << " to " << path << std::endl;
+
+    // Validate headers
+    for (std::pair<std::string, std::string> p : request.header_vars) {
+        std::cout << "  " << p.first << " = " << p.second << std::endl;
+    }
+    if (!((
+        request.header_vars.count(HEADER_USER_AGENT) &&
+        request.header_vars[HEADER_USER_AGENT].find("Mozilla") == 0
+    ) && (
+        request.header_vars.count(HEADER_ACCEPT_LANGUAGE) && (
+            request.header_vars[HEADER_ACCEPT_LANGUAGE][0] == '*' || (
+                request.header_vars[HEADER_ACCEPT_LANGUAGE][0] >= 'a' &&
+                request.header_vars[HEADER_ACCEPT_LANGUAGE][0] <= 'z'
+            )
+        )
+    )
+#ifdef DOMAIN
+    && (
+        request.header_vars.count(HEADER_HOST) &&
+        request.header_vars[HEADER_HOST].find(DOMAIN) == 0
+    )
+#endif
+    )) {
+        //not_found(request);
+        std::cout << "  Rejected" << std::endl;
+        return;
+    }
+
+    // ===========================
+    // ===== Body processing =====
+    // ===========================
 
     // Parse content length
     int content_length = 0;
@@ -176,32 +224,9 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
         }
     }
 
-    // Parse the request line: METHOD <SP> path <SP> HTTP/x.x
-    char *time_str = std::ctime(&req_time);
-    time_str[24] = '\0';
-    std::istringstream ss(buf);
-    std::string method, path, version;
-    ss >> method >> path >> version;
-    std::cout << time_str << ": HTTP " << method << " to " << path << std::endl;
-
-    // Validate headers
-    for (std::pair<std::string, std::string> p : request.header_vars) {
-        std::cout << "  " << p.first << " = " << p.second << std::endl;
-    }
-    if (!((
-        request.header_vars.count(HEADER_USER_AGENT) &&
-        request.header_vars[HEADER_USER_AGENT].find("Mozilla") == 0
-    ) && (
-        request.header_vars.count(HEADER_ACCEPT_LANGUAGE) && (
-            request.header_vars[HEADER_ACCEPT_LANGUAGE][0] == '*' || (
-                request.header_vars[HEADER_ACCEPT_LANGUAGE][0] >= 'a' &&
-                request.header_vars[HEADER_ACCEPT_LANGUAGE][0] <= 'z'
-            )
-        )
-    ))) {
-        //not_found(request);
-        return;
-    }
+    // ============================
+    // ===== Route processing =====
+    // ============================
 
     // copy path into buffer
     int path_size = path.size();

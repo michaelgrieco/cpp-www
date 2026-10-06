@@ -11,10 +11,11 @@ endif
 ifeq (,$(DOMAIN))
 $(error Error: Cannot find a domain name for which to generate the SSL certificates.)
 endif
+DOMAIN_FLAGS := "-DDOMAIN=\"$(DOMAIN)\""
 
 CXX      := g++
-CXXFLAGS := -std=c++11 -Wall -Wextra -Wpedantic $(TOTP_FLAGS)
-INCLUDES := -I include $(TOTP_INCLUDE)
+CXXFLAGS := -std=c++11 -Wall -Wextra -Wpedantic $(TOTP_FLAGS) $(DOMAIN_FLAGS)
+INCLUDES := -I include
 LDFLAGS  := -lssl -lcrypto
 
 TARGET    := app

@@ -31,7 +31,8 @@ void home_http_server::get_file(http_request_t request) {
     }
 
     // get file path and extension
-    std::string file_path = "www/" + file_name;
+    std::string www_prefix = (file_name[0] == '\0' || file_name[0] == '/') ? "www" : "www/";
+    std::string file_path = www_prefix + file_name;
     std::string file_type = "";
     int dot_idx = file_name.find_last_of('.');
     if (dot_idx == -1) {
@@ -55,20 +56,19 @@ void home_http_server::get_file(http_request_t request) {
             while ((entry = readdir(dir)) != NULL) {
                 std::string path = entry->d_name;
                 if (path == "." || path == "..") continue;
-                std::cout << "Directory entry " << path << std::endl;
-                ss << "<li><a href=\"/www/" << file_name << "/" << path << "\">" << path << "</a></li>" << "\r\n";
+                std::cout << "  Entry is " << path << std::endl;
+                ss << "<li><a href=\"/" << file_path << "/" << path << "\">" << path << "</a></li>" << "\r\n";
+                std::cout << "<li><a href=\"/" << file_path << "/" << path << "\">" << path << "</a></li>" << "\r\n";
             }
             closedir(dir);
         }
         ss << "</ul>";
         std::string str = ss.str();
-        std::cout << "HTML " << str << std::endl;
 
         // compute total size
         int length = get_file_size("www/directory.prefix.html")
             + str.length()
             + get_file_size("www/directory.postfix.html");
-        std::cout << "Total length: " << get_file_size("www/directory.prefix.html") << ", " << str.length() << ", " << get_file_size("www/directory.postfix.html") << " for a sum of " << length << std::endl;
 
         // send response
         send_http_response_status(request.ssl, HTTP_OKAY);

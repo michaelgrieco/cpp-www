@@ -21,9 +21,21 @@
 #include "route.h"
 #include "schema.h"
 
+// header names
+#define HEADER_CONTENT_LENGTH "content-length"
+#define HEADER_CONTENT_TYPE "content-type"
+#define HEADER_USER_AGENT "user-agent"
+#define HEADER_ACCEPT_LANGUAGE "accept-language"
+#define HEADER_HOST "host"
+
 // Request methods
 #define HTTP_GET "GET"
 #define HTTP_POST "POST"
+
+#define HTTP_METHOD_SET(name) static std::set<std::string> name = { \
+    HTTP_GET, \
+    HTTP_POST, \
+};
 
 // Response statuses
 typedef enum {
