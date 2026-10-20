@@ -3,6 +3,7 @@
 #define __HOME_HTTP_SERVER_H__
 
 #include "http_server.h"
+#include "totp.h"
 
 class home_http_server : public http_server {
 
@@ -30,6 +31,9 @@ private:
     static void post_secret(http_request_t request);
     static void fetch_secret(http_request_t request);
     static void post_secret_file(http_request_t request);
+
+    // TOTP validator (static since the route callbacks are static)
+    static totp totp_validator;
 
 };
 

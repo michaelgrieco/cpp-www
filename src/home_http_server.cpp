@@ -17,6 +17,8 @@
 // ===== Callback functions =====
 // ==============================
 
+totp home_http_server::totp_validator;
+
 void home_http_server::get_file(http_request_t request) {
     // validate file name
     std::string file_name = request.vars["www"].value.s;
@@ -307,7 +309,7 @@ void home_http_server::get_form_data(http_request_t request) {
     parse_query_args(request.body, form_vars);
 
     // validate OTP secret
-    totp_security_level_e level = validate_totp_permissions(form_vars["totp"], TOTP_DATA_READER);
+    totp_security_level_e level = totp_validator.validate_totp_permissions(form_vars["totp"], TOTP_DATA_READER);
     std::cout << "Returned level " << level << std::endl;
     if (level == TOTP_UNAUTHORIZED) {
         send_http_response_status(request.ssl, HTTP_UNAUTHORIZED);
@@ -343,7 +345,7 @@ void home_http_server::post_secret_file(http_request_t request) {
     });
 
     // validate OTP secret
-    totp_security_level_e level = validate_totp_permissions(form["totp"], TOTP_ADMIN | TOTP_FILE_UPLOADER);
+    totp_security_level_e level = totp_validator.validate_totp_permissions(form["totp"], TOTP_ADMIN | TOTP_FILE_UPLOADER);
     std::cout << "Returned level " << level << std::endl;
     if (level == TOTP_UNAUTHORIZED) {
         send_http_response_status(request.ssl, HTTP_UNAUTHORIZED);
