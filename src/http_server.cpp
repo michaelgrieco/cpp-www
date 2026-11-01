@@ -10,6 +10,10 @@
 #include "schema.h"
 #include "route.h"
 
+#ifndef BLOCKED_ROUTES_FILE
+#define BLOCKED_ROUTES_FILE "./blocked_routes.txt"
+#endif
+
 HTTP_METHOD_SET(http_method_set);
 
 // =======================================
@@ -18,7 +22,45 @@ HTTP_METHOD_SET(http_method_set);
 
 http_server::http_server(int port, bool https, const char *cert_file, const char *key_file)
     : port(port), https(https), cert_file((char*)cert_file), key_file((char*)key_file) {
-    
+    load_blocked_routes(BLOCKED_ROUTES_FILE);
+}
+
+// Each line is one route, normalized to the template_route form (no leading '/', trailing '/')
+void http_server::load_blocked_routes(const char *filename) {
+    // skip if the file is missing or not newer than the last load
+    struct stat st;
+    if (stat(filename, &st) != 0) return;
+    if (st.st_mtim.tv_sec < blocked_routes_mtime.tv_sec ||
+        (st.st_mtim.tv_sec == blocked_routes_mtime.tv_sec &&
+         st.st_mtim.tv_nsec <= blocked_routes_mtime.tv_nsec)) {
+        return;
+    }
+
+    std::ifstream file(filename);
+    if (!file.is_open()) return;
+    blocked_routes_mtime = st.st_mtim;
+    blocked_routes.clear();
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.size() <= 0 || line[0] == '#') {
+            continue;
+        }
+
+        // trim whitespace (including a trailing '\r')
+        std::size_t start = line.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) continue;
+        std::size_t end = line.find_last_not_of(" \t\r\n");
+        std::string route = line.substr(start, end - start + 1);
+
+        std::size_t first = route.find_first_not_of('/');
+        if (first == std::string::npos) continue;
+        route = route.substr(first);
+        if (route.back() != '/') route += '/';
+
+        blocked_routes.insert(route);
+    }
+    std::cout << "Loaded " << (int)blocked_routes.size() << " blocked routes" << std::endl;
 }
 
 http_server::~http_server() {
@@ -81,6 +123,8 @@ void http_server::listen() {
 // Respond to a client request
 #define BUF_SIZE 2048
 void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
+    load_blocked_routes(BLOCKED_ROUTES_FILE);
+
     const auto now = std::chrono::system_clock::now();
     std::time_t req_time = std::chrono::system_clock::to_time_t(now);
 
@@ -232,6 +276,7 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
     int path_size = path.size();
     memcpy(tmp, path.c_str(), path_size);
     tmp[path_size] = '\0';
+    std::ostringstream template_route;
 
     // lookup function callback for each branch of the path
     route_node_t *dst = root_ptr;
@@ -277,6 +322,8 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
             dst = next_dst;
             if (!dst) break;
 
+            template_route << dst->name << '/';
+
             // test if should skip scanning the rest of the route
             if (dst->is_final_node) {
                 // scan to find end of URL route
@@ -313,7 +360,7 @@ void http_server::handle_client(SSL* ssl, route_node_t *root_ptr) {
     parse_query_args(tmp, i, path_size, request.vars);
 
     // callback
-    if (dst) {
+    if (dst && !blocked_routes.count(template_route.str())) {
         if (dst->callbacks.count(method)) {
             dst->callbacks.operator[](method)(request);
             return;

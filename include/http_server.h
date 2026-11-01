@@ -10,10 +10,12 @@
 #include <ctime>
 #include <map>
 #include <vector>
+#include <unordered_set>
 
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
@@ -61,6 +63,12 @@ protected:
     route_node_t *root_ptr;
     std::vector<route_node_t*> route_nodes;
 
+    // routes (in template_route form, e.g. "api/users/") that always return not found
+    std::unordered_set<std::string> blocked_routes;
+
+    // modified time of the blocked routes file at the last load
+    struct timespec blocked_routes_mtime = {0, 0};
+
     // client variables
     int      g_listen_fd = -1;
     SSL_CTX* g_ctx       = nullptr;
@@ -72,6 +80,9 @@ private:
 
     // Respond to a client request
     void handle_client(SSL* ssl, route_node_t *root_ptr);
+
+    // Load blocked routes from file, if it exists and is newer than the last load
+    void load_blocked_routes(const char *filename);
 
 };
 

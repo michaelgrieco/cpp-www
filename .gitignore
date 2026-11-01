@@ -3,6 +3,8 @@ data/secret
 data/uploads
 data/*.crt
 data/*.key
+www/forms/*.json
+!www/forms/test.json
 certs
 app
 build
