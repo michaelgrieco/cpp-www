@@ -439,7 +439,7 @@ void send_http_response_body(SSL* ssl, std::string content_type, std::string bod
     send_response(ssl, body);
 }
 
-void send_http_response_file(SSL* ssl, std::string content_type, std::string path, bool send_headers) {
+void send_http_response_file(SSL* ssl, std::string content_type, std::string path, bool send_headers, cache_control_t cache_control) {
     // read file
     std::ifstream f(path, std::ios::binary);
     int file_size = get_file_size(f);
@@ -447,6 +447,27 @@ void send_http_response_file(SSL* ssl, std::string content_type, std::string pat
     // write headers
     if (send_headers) {
         std::ostringstream buf;
+
+        // cache control
+        if (cache_control.do_cache) {
+            buf << "Cache-Control: ";
+            if (cache_control.is_public) {
+                buf << "public,";
+            }
+            else {
+                buf << "private,";
+            }
+            buf << "max_age=" << cache_control.max_age;
+            if (cache_control.immutable) {
+                buf << ",immutable";
+            }
+            else {
+                buf << ",must-revalidate";
+            }
+            buf << "\r\n";
+        }
+
+        // file type and size
         buf << "Content-Type: " << content_type << "\r\n"
         << "Content-Length: " << file_size << "\r\n"
         << "\r\n";

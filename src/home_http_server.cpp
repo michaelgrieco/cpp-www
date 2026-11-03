@@ -35,14 +35,15 @@ void home_http_server::get_file(http_request_t request) {
     // get file path and extension
     std::string www_prefix = (file_name[0] == '\0' || file_name[0] == '/') ? "www" : "www/";
     std::string file_path = www_prefix + file_name;
-    std::string file_type = "";
+    std::string file_type;
     int dot_idx = file_name.find_last_of('.');
     if (dot_idx == -1) {
-        file_type += "plain";
+        file_type = "plain";
     }
     else {
-        file_type += file_name.substr(dot_idx + 1);
+        file_type = file_name.substr(dot_idx + 1);
     }
+    file_type = file_name.substr(dot_idx + 1);
     std::cout << "  File name is " << file_name << " with type " << file_type << std::endl;
 
     // list directory contents or stream file
@@ -82,13 +83,23 @@ void home_http_server::get_file(http_request_t request) {
         send_http_response_body(request.ssl, "text/html", str, false);
         send_http_response_file(request.ssl, "text/html", "www/directory.postfix.html", false);
     }
-    // stream file
     else {
+        // determine cache-ability
+        cache_control_t cache_control = NOCACHE_CACHE_CONTROL;
+        //if (file_type == "css" || file_type == "png") {
+        if (file_type == "png") {
+            cache_control = IMMUTABLE_CACHE_CONTROL(31536000);
+        }
+        else if (file_type == "html") {
+            cache_control = IMMUTABLE_CACHE_CONTROL(300);
+        }
+
+        // stream file
         std::ifstream file(file_path);
         if (file.good()) {
             send_http_response_status(request.ssl, HTTP_OKAY);
             send_http_response_headers(request.ssl, {});
-            send_http_response_file(request.ssl, file_type, file_path);
+            send_http_response_file(request.ssl, file_type, file_path, true, cache_control);
         } else {
             respond_not_found(request);
         }

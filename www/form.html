@@ -3,8 +3,9 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Fill out form</title>
-        <link rel="stylesheet" href="/www/assets/css/bootstrap.min.css" />
+        <title>Fill out a form!</title>
+        <link rel="stylesheet" type="text/css" href="/www/assets/css/style.min.css" />
+        <link rel="icon" type="image/png" href="/www/assets/cgi-bin/favicon.png" />
 
         <script type="text/javascript">
             document.addEventListener('DOMContentLoaded', async () => {
@@ -27,10 +28,15 @@
                     // create form item
                     if (item.element === 'input') {
                         if (item.prompt) {
+                            let txt = item.prompt;
+                            if (item.required) {
+                                txt += "*";
+                            }
+
                             const label = document.createElement('label');
                             label.setAttribute('for', item.name);
                             label.className = 'form-label';
-                            label.innerHTML = item.prompt;
+                            label.innerHTML = txt;
                             wrapper.appendChild(label);
                         }
 
@@ -175,11 +181,19 @@
                             createFormItem(child, wrapper);
                         }
                     }
+
+                    // add class name for headers
+                    if (el && item.element.length === 2 && item.element[0] === 'h' && item.element[1] >= '1' && item.element[1] <= '6') {
+                        el.classList.add('title');
+                    }
                 };
 
                 for (const item of data.elements) {
                     const wrapper = document.createElement('div');
-                    wrapper.className = 'mb-3 ' + item.wrapperClassName;
+                    wrapper.className = 'mb-3';
+                    if (item.wrapperClassName) {
+                        wrapper.className += " " + item.wrapperClassName;
+                    }
                     createFormItem(item, wrapper);
                     formEl.appendChild(wrapper);
                 }
@@ -213,7 +227,7 @@
         <div class="container mt-5">
             <div class="row justify-content-center">
                 <div class="col-md-6">
-                    <h5 class="mb-3" id="form-title">Form Title</h5>
+                    <h1 class="mb-3 title" id="form-title">Form Title</h5>
                     <form method="POST">
                     </form>
                 </div>

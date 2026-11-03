@@ -42,8 +42,11 @@ $(TOTP_SECRET_FILE):
 	@echo "$$(tr -dc 'A-Z2-7' < /dev/urandom | head -c 32)" > $(TOTP_SECRET_FILE)
 totp: $(TOTP_SECRET_FILE)
 
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+www/assets/css/%.min.css: www/assets/css/%.css
+	@./www/assets/css/minify_css.sh $< $@
+
+$(TARGET): $(OBJS) www/assets/css/style.min.css
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS) $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@

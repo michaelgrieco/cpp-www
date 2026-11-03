@@ -3,6 +3,8 @@ data/secret
 data/uploads
 data/*.crt
 data/*.key
+www/assets/css/style.min.css
+www/assets/cgi-bin
 www/forms/*.json
 !www/forms/test.json
 certs

@@ -31,7 +31,6 @@
 // Request methods
 #define HTTP_GET "GET"
 #define HTTP_POST "POST"
-
 #define HTTP_METHOD_SET(name) static std::set<std::string> name = { \
     HTTP_GET, \
     HTTP_POST, \
@@ -46,8 +45,6 @@ typedef enum {
     HTTP_NOT_FOUND = 404,
     HTTP_INTERNAL_ERROR = 500
 } http_status_t;
-
-// Map of HTTP statuses to the text value
 #define HTTP_STATUS_TEXT_MAP(name) static std::map<int, std::string> name = { \
     { HTTP_OKAY, "OKAY" }, \
     { HTTP_MOVED_PERMANENTLY, "Moved Permanently" }, \
@@ -57,11 +54,20 @@ typedef enum {
     { HTTP_INTERNAL_ERROR, "Internal Server Error" } \
 };
 
-// Content types
+// cache control
+typedef struct {
+    bool do_cache;
+    bool is_public;
+    bool immutable;
+    uint32_t max_age;
+} cache_control_t;
+#define NOCACHE_CACHE_CONTROL {false, false, false, 0}
+#define IMMUTABLE_CACHE_CONTROL(age) {true, true, true, age}
 
 // Forward declaration - http_request_t is defined in http_server.h
 struct http_request_t;
 
+// parse a query string
 void parse_query_args(char *buf, int i, int path_size, variables_t &vars);
 void parse_query_args(std::string buf, variables_t &vars);
 
@@ -77,17 +83,14 @@ void parse_multipart_args(
     const std::map<std::string, schema_field_t> &schema,
     const std::string &upload_dir = "data/uploads");
 
-std::string http_response(http_status_t status, const std::string& status_text,
-                                 const std::string& content_type,
-                                 const std::string& body,
-                                 std::vector<std::string> headers);
-
+// get the size of a file
 int get_file_size(std::ifstream &f);
 int get_file_size(std::string path);
 
+// construct pieces of an HTTP response
 void send_http_response_status(SSL* ssl, http_status_t status);
 void send_http_response_headers(SSL* ssl, std::map<std::string, std::string> headers, bool close_headers = false);
 void send_http_response_body(SSL* ssl, std::string content_type, std::string body, bool send_headers = true);
-void send_http_response_file(SSL* ssl, std::string content_type, std::string path, bool send_headers = true);
+void send_http_response_file(SSL* ssl, std::string content_type, std::string path, bool send_headers = true, cache_control_t cache_control = NOCACHE_CACHE_CONTROL);
 
 #endif // __HTTP_H__
